@@ -41,7 +41,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         })
         if (error) throw error
@@ -51,7 +51,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         const { error } = await supabase.auth.signInWithOtp({
           email,
           options: {
-            emailRedirectTo: `${window.location.origin}/`
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         })
         if (error) throw error
