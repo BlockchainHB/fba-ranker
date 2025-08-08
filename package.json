@@ -1,7 +1,19 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
-  "private": true,
+  "name": "fba-hangout-leaderboard",
+  "version": "1.0.0",
+  "description": "A competitive leaderboard platform for Amazon FBA sellers to track and showcase their monthly and all-time profits",
+  "keywords": ["amazon-fba", "leaderboard", "nextjs", "supabase", "sellers", "profit-tracking", "competition"],
+  "homepage": "https://github.com/BlockchainHB/fba-ranker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BlockchainHB/fba-ranker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BlockchainHB/fba-ranker/issues"
+  },
+  "license": "MIT",
+  "author": "FBA Hangout",
+  "private": false,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
@@ -22,7 +34,7 @@
     "@radix-ui/react-hover-card": "1.1.4",
     "@radix-ui/react-label": "2.1.1",
     "@radix-ui/react-menubar": "1.1.4",
-    "@radix-ui/react-navigation-menu": "1.2.3",
+    "@radix-ui/react-navigation-menu": "^1.2.3",
     "@radix-ui/react-popover": "1.1.4",
     "@radix-ui/react-progress": "1.1.1",
     "@radix-ui/react-radio-group": "1.2.2",
