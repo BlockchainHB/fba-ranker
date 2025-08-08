@@ -1,0 +1,237 @@
+"use client"
+
+import * as React from "react"
+import { useEffect, useMemo, useState } from "react"
+import SiteHeader from "@/components/site-header"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Separator } from "@/components/ui/separator"
+import { ProofDialog } from "@/components/proof-dialog"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar" // New shadcn sidebar primitives [^vercel_knowledge_base]
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+
+type Tab = "pending" | "approved" | "rejected"
+
+interface SubmissionRow {
+  id: string
+  user_id: string
+  product_name: string
+  revenue: number
+  cost: number
+  profit: number
+  date: string
+  note: string | null
+  proof_url: string | null
+  status: Tab
+  profiles?: { name: string | null; discord: string | null } | null
+}
+
+export default function AdminPage() {
+  const supabase = getSupabaseBrowserClient()
+  const [isAuthed, setIsAuthed] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminPasscode, setAdminPasscode] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>("pending")
+  const [rows, setRows] = useState<SubmissionRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [proofOpen, setProofOpen] = useState(false)
+  const [proofUrl, setProofUrl] = useState<string | undefined>(undefined)
+  const [proofTitle, setProofTitle] = useState<string>("")
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      setIsAuthed(!!data.user)
+      if (data.user) {
+        const { data: prof } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
+        setIsAdmin(prof?.role === "admin")
+      }
+    })
+  }, [supabase])
+
+  const headers = async () => {
+    const token = (await supabase.auth.getSession()).data.session?.access_token
+    const h: HeadersInit = {}
+    if (token) h["Authorization"] = `Bearer ${token}`
+    if (!isAdmin && adminPasscode) h["x-admin-passcode"] = adminPasscode
+    return h
+  }
+
+  async function load() {
+    setLoading(true)
+    const h = await headers()
+    const res = await fetch(`/api/admin/submissions?status=${activeTab}`, { headers: h })
+    const json = await res.json()
+    setRows(json.submissions || [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isAdmin, adminPasscode])
+
+  async function gate() {
+    const pass = prompt("Enter admin passcode (demo: admin)")
+    if (pass) setAdminPasscode(pass)
+  }
+
+  async function approve(id: string) {
+    const h = await headers()
+    const res = await fetch(`/api/admin/submissions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...h },
+      body: JSON.stringify({ status: "approved" }),
+    })
+    if (!res.ok) alert("Failed to approve")
+    load()
+  }
+
+  async function reject(id: string) {
+    const h = await headers()
+    const res = await fetch(`/api/admin/submissions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...h },
+      body: JSON.stringify({ status: "rejected" }),
+    })
+    if (!res.ok) alert("Failed to reject")
+    load()
+  }
+
+  const filtered = useMemo(() => rows, [rows])
+
+  if (!isAdmin && !adminPasscode) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader />
+        <main className="mx-auto max-w-3xl px-4 py-12">
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Access</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Sign in with an admin account or use the demo passcode to continue.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={gate}>Enter passcode</Button>
+                <Button variant="outline" onClick={() => (window.location.href = "/signup")}>Manage profile</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen bg-background">
+        <Sidebar>
+          <SidebarHeader />
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Review</SidebarGroupLabel>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={activeTab === "pending"} onClick={() => setActiveTab("pending")}>Pending</SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={activeTab === "approved"} onClick={() => setActiveTab("approved")}>Approved</SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={activeTab === "rejected"} onClick={() => setActiveTab("rejected")}>Rejected</SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarRail />
+        </Sidebar>
+        <SidebarInset>
+          <SiteHeader />
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger />
+            <Separator orientation="vertical" className="mx-2 h-4" />
+            <div className="text-sm text-muted-foreground">Admin Queue • {activeTab[0].toUpperCase() + activeTab.slice(1)}</div>
+            <div className="ml-auto">
+              <Button variant="outline" size="sm" onClick={load} disabled={loading}>{loading ? "Loading..." : "Refresh"}</Button>
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-6xl p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Submissions • {activeTab}</span>
+                  <Badge variant="secondary">Total: {filtered.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Seller</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Cost</TableHead>
+                      <TableHead className="text-right">Profit</TableHead>
+                      <TableHead className="text-right">Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map(s => (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{s.profiles?.name ?? "Unknown"}</span>
+                            <span className="text-xs text-muted-foreground">{s.profiles?.discord}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate">{s.product_name}</TableCell>
+                        <TableCell className="text-right">${Number(s.revenue).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">${Number(s.cost).toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">${Number(s.profit).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-xs">{new Date(s.date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => { setProofUrl(s.proof_url || undefined); setProofTitle(`${s.profiles?.name}'s proof`); setProofOpen(true) }}>View</Button>
+                            {activeTab === "pending" && (
+                              <>
+                                <Button size="sm" onClick={() => approve(s.id)}>Approve</Button>
+                                <Button size="sm" variant="destructive" onClick={() => reject(s.id)}>Reject</Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filtered.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">No submissions.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </main>
+          <ProofDialog open={proofOpen} onOpenChange={setProofOpen} title={proofTitle} proofDataUrl={proofUrl} />
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
+  )
+}
