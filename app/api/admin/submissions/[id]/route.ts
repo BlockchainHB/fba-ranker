@@ -33,3 +33,35 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ submission: data })
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const supabase = getSupabaseServerClient()
+  const id = params.id
+
+  const authHeader = req.headers.get("authorization") || undefined
+  const user = await getUserFromAuthHeader(authHeader)
+  const passcode = req.headers.get("x-admin-passcode")
+
+  // Same admin authorization check
+  if (!user && passcode !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  if (user) {
+    const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    if (me?.role !== "admin" && passcode !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+  } else if (passcode !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  // Delete the submission
+  const { error } = await supabase.from("submissions").delete().eq("id", id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  
+  return NextResponse.json({ message: "Submission deleted successfully" })
+}

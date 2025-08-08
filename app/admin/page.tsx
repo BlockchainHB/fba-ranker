@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import SiteHeader from "@/components/site-header"
+import { AdminSidebar } from "@/components/admin-sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +26,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar" // New shadcn sidebar primitives [^vercel_knowledge_base]
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import { Trophy } from "lucide-react"
 
 type Tab = "pending" | "approved" | "rejected"
 
@@ -52,13 +56,27 @@ export default function AdminPage() {
   const [proofOpen, setProofOpen] = useState(false)
   const [proofUrl, setProofUrl] = useState<string | undefined>(undefined)
   const [proofTitle, setProofTitle] = useState<string>("")
+  const [allRows, setAllRows] = useState<SubmissionRow[]>([])
+  const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 })
+  const [userInfo, setUserInfo] = useState<{ name?: string; email?: string; avatar?: string }>({})
+
+  async function signOut() {
+    const supabase = getSupabaseBrowserClient()
+    await supabase.auth.signOut()
+    window.location.href = "/"
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       setIsAuthed(!!data.user)
       if (data.user) {
-        const { data: prof } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
+        const { data: prof } = await supabase.from("profiles").select("role, name").eq("id", data.user.id).single()
         setIsAdmin(prof?.role === "admin")
+        setUserInfo({
+          name: prof?.name || data.user.user_metadata?.name || data.user.email || "Admin User",
+          email: data.user.email,
+          avatar: data.user.user_metadata?.avatar_url
+        })
       }
     })
   }, [supabase])
@@ -74,9 +92,31 @@ export default function AdminPage() {
   async function load() {
     setLoading(true)
     const h = await headers()
+    
+    // Load current tab data
     const res = await fetch(`/api/admin/submissions?status=${activeTab}`, { headers: h })
     const json = await res.json()
     setRows(json.submissions || [])
+    
+    // Load counts for all statuses for sidebar badges
+    const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+      fetch('/api/admin/submissions?status=pending', { headers: h }),
+      fetch('/api/admin/submissions?status=approved', { headers: h }),
+      fetch('/api/admin/submissions?status=rejected', { headers: h })
+    ])
+    
+    const [pendingData, approvedData, rejectedData] = await Promise.all([
+      pendingRes.json(),
+      approvedRes.json(), 
+      rejectedRes.json()
+    ])
+    
+    setCounts({
+      pending: pendingData.submissions?.length || 0,
+      approved: approvedData.submissions?.length || 0,
+      rejected: rejectedData.submissions?.length || 0,
+    })
+    
     setLoading(false)
   }
 
@@ -97,7 +137,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json", ...h },
       body: JSON.stringify({ status: "approved" }),
     })
-    if (!res.ok) alert("Failed to approve")
+    if (!res.ok) toast.error("Failed to approve")
     load()
   }
 
@@ -108,7 +148,25 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json", ...h },
       body: JSON.stringify({ status: "rejected" }),
     })
-    if (!res.ok) alert("Failed to reject")
+    if (!res.ok) toast.error("Failed to reject")
+    load()
+  }
+
+  async function deleteSubmission(id: string) {
+    if (!confirm("Are you sure you want to permanently delete this submission? This action cannot be undone.")) {
+      return
+    }
+    
+    const h = await headers()
+    const res = await fetch(`/api/admin/submissions/${id}`, {
+      method: "DELETE",
+      headers: h,
+    })
+    if (!res.ok) {
+      toast.error("Failed to delete submission")
+    } else {
+      toast.success("Submission deleted successfully")
+    }
     load()
   }
 
@@ -139,37 +197,31 @@ export default function AdminPage() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen bg-background">
-        <Sidebar>
-          <SidebarHeader />
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupLabel>Review</SidebarGroupLabel>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={activeTab === "pending"} onClick={() => setActiveTab("pending")}>Pending</SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={activeTab === "approved"} onClick={() => setActiveTab("approved")}>Approved</SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={activeTab === "rejected"} onClick={() => setActiveTab("rejected")}>Rejected</SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-          </SidebarContent>
-          <SidebarRail />
-        </Sidebar>
-        <SidebarInset>
-          <SiteHeader />
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "19rem",
+        } as React.CSSProperties
+      }
+    >
+              <AdminSidebar 
+          activeTab={activeTab}
+          pendingCount={counts.pending}
+          approvedCount={counts.approved}
+          rejectedCount={counts.rejected}
+          onTabChange={(tab) => setActiveTab(tab as Tab)}
+          userName={userInfo.name}
+          userEmail={userInfo.email}
+          userAvatar={userInfo.avatar}
+          onSignOut={signOut}
+          onRefresh={load}
+        />
+      <SidebarInset>
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <Separator orientation="vertical" className="mx-2 h-4" />
             <div className="text-sm text-muted-foreground">Admin Queue • {activeTab[0].toUpperCase() + activeTab.slice(1)}</div>
-            <div className="ml-auto">
-              <Button variant="outline" size="sm" onClick={load} disabled={loading}>{loading ? "Loading..." : "Refresh"}</Button>
-            </div>
+
           </header>
           <main className="mx-auto w-full max-w-6xl p-4">
             <Card>
@@ -215,6 +267,11 @@ export default function AdminPage() {
                                 <Button size="sm" variant="destructive" onClick={() => reject(s.id)}>Reject</Button>
                               </>
                             )}
+                            {activeTab === "approved" && (
+                              <Button size="sm" variant="destructive" onClick={() => deleteSubmission(s.id)}>
+                                Delete
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -231,7 +288,6 @@ export default function AdminPage() {
           </main>
           <ProofDialog open={proofOpen} onOpenChange={setProofOpen} title={proofTitle} proofDataUrl={proofUrl} />
         </SidebarInset>
-      </div>
     </SidebarProvider>
   )
 }

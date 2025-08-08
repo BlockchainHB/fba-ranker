@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSupabaseServerClient, getUserFromAuthHeader } from "@/lib/supabase/server"
+import { getSupabaseServerClient, getUserFromAuthHeader, getSupabaseUserClient } from "@/lib/supabase/server"
 
 export async function POST(req: NextRequest) {
-  const supabase = getSupabaseServerClient()
   const authHeader = req.headers.get("authorization") || undefined
   const user = await getUserFromAuthHeader(authHeader)
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+  
+  // Use service role client for database operations
+  const supabase = getSupabaseServerClient()
   const body = await req.json()
   const { productName, revenue, cost, date, note, proofUrl } = body as {
     productName: string

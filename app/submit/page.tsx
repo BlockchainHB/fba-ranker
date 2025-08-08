@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 export default function SubmitPage() {
   const supabase = getSupabaseBrowserClient()
@@ -50,12 +51,12 @@ export default function SubmitPage() {
       const token = sessionData.session?.access_token
       const userId = sessionData.session?.user?.id
       if (!token || !userId) {
-        alert("Please sign in first.")
+        toast.error("Please sign in first.")
         setSubmitting(false)
         return
       }
       const proofUrl = await uploadProof(userId).catch(err => {
-        console.warn("Upload failed:", err)
+        // Upload failed, continue without proof image
         return undefined
       })
       const res = await fetch("/api/submissions", {
@@ -77,10 +78,10 @@ export default function SubmitPage() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error || "Failed to submit")
       }
-      alert("Submission sent. Waiting for admin approval.")
+      toast.success("Submission sent. Waiting for admin approval.")
       window.location.href = "/"
     } catch (err: any) {
-      alert(err.message || "Something went wrong.")
+      toast.error(err.message || "Something went wrong.")
     } finally {
       setSubmitting(false)
     }
@@ -140,9 +141,7 @@ export default function SubmitPage() {
               <div>
                 <label className="text-sm font-medium">Proof image</label>
                 <Input type="file" accept="image/*" onChange={onFileChange} />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Stored in Supabase Storage bucket "proofs". Make sure the bucket exists with public read.
-                </p>
+
               </div>
               <Button type="submit" disabled={!authed || submitting}>{submitting ? "Submitting..." : "Submit"}</Button>
               {!authed && <p className="text-xs text-red-600">You must sign in first.</p>}
