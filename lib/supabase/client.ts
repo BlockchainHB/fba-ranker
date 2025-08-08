@@ -13,6 +13,8 @@ export function getSupabaseBrowserClient() {
       persistSession: true,
       detectSessionInUrl: true,
       flowType: "pkce",
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      storageKey: 'supabase.auth.token',
     },
   })
   return browserClient
