@@ -36,6 +36,7 @@ export default function AdminUsersPage() {
   const [adminPasscode, setAdminPasscode] = useState<string | null>(null)
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   const [userInfo, setUserInfo] = useState<{ name?: string; email?: string; avatar?: string }>({})
 
   async function signOut() {
@@ -45,6 +46,7 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
+    setAuthLoading(true)
     supabase.auth.getUser().then(async ({ data }) => {
       setIsAuthed(!!data.user)
       if (data.user) {
@@ -56,6 +58,7 @@ export default function AdminUsersPage() {
           avatar: data.user.user_metadata?.avatar_url
         })
       }
+      setAuthLoading(false)
     })
   }, [supabase])
 
@@ -113,6 +116,18 @@ export default function AdminUsersPage() {
     } else {
       toast.error(`Error: ${json.error}`)
     }
+  }
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!isAdmin && !adminPasscode) {

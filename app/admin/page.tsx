@@ -53,6 +53,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("pending")
   const [rows, setRows] = useState<SubmissionRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   const [proofOpen, setProofOpen] = useState(false)
   const [proofUrl, setProofUrl] = useState<string | undefined>(undefined)
   const [proofTitle, setProofTitle] = useState<string>("")
@@ -67,6 +68,7 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
+    setAuthLoading(true)
     supabase.auth.getUser().then(async ({ data }) => {
       setIsAuthed(!!data.user)
       if (data.user) {
@@ -78,6 +80,7 @@ export default function AdminPage() {
           avatar: data.user.user_metadata?.avatar_url
         })
       }
+      setAuthLoading(false)
     })
   }, [supabase])
 
@@ -171,6 +174,21 @@ export default function AdminPage() {
   }
 
   const filtered = useMemo(() => rows, [rows])
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader />
+        <main className="mx-auto max-w-3xl px-4 py-12 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   if (!isAdmin && !adminPasscode) {
     return (

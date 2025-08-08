@@ -55,6 +55,7 @@ export default function AdminRolesPage() {
   const [userInfo, setUserInfo] = useState<{ name?: string; email?: string; avatar?: string }>({})
   const [roleStats, setRoleStats] = useState<{ admin: number; user: number }>({ admin: 0, user: 0 })
   const [loading, setLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
 
   async function signOut() {
     const supabase = getSupabaseBrowserClient()
@@ -63,6 +64,7 @@ export default function AdminRolesPage() {
   }
 
   useEffect(() => {
+    setAuthLoading(true)
     supabase.auth.getUser().then(async ({ data }) => {
       setIsAuthed(!!data.user)
       if (data.user) {
@@ -74,6 +76,7 @@ export default function AdminRolesPage() {
           avatar: data.user.user_metadata?.avatar_url
         })
       }
+      setAuthLoading(false)
     })
   }, [supabase])
 
@@ -110,6 +113,18 @@ export default function AdminRolesPage() {
   async function gate() {
     const pass = prompt("Enter admin passcode (demo: admin)")
     if (pass) setAdminPasscode(pass)
+  }
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!isAdmin && !adminPasscode) {
