@@ -11,9 +11,13 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Package, DollarSign, TrendingUp, MousePointer, Eye, ShoppingCart, Star, ChevronLeft, ChevronRight, Check } from "lucide-react"
+import { Package, DollarSign, TrendingUp, MousePointer, Eye, ShoppingCart, Star, ChevronLeft, ChevronRight, Check, CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 
 // Define the steps for the multi-step form
 const STEPS = [
@@ -62,7 +66,7 @@ export default function SubmitPage() {
   const [inventoryValue, setInventoryValue] = useState<number | "">("")
   const [returnRate, setReturnRate] = useState<number | "">("")
   
-  const [date, setDate] = useState<string>("")
+  const [date, setDate] = useState<Date>(new Date())
   const [note, setNote] = useState("")
   const profit = typeof revenue === "number" && typeof cost === "number" ? Math.max(0, revenue - cost) : 0
   const [file, setFile] = useState<File | null>(null)
@@ -171,7 +175,7 @@ export default function SubmitPage() {
           inventoryValue: typeof inventoryValue === "number" ? inventoryValue : null,
           returnRate: typeof returnRate === "number" ? returnRate : null,
           
-          date,
+          date: date.toISOString(),
           note,
           proofUrl,
         }),
@@ -276,7 +280,7 @@ export default function SubmitPage() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent side="bottom" align="start" sideOffset={4} position="popper">
                     <SelectItem value="USD">USD</SelectItem>
                     <SelectItem value="CAD">CAD</SelectItem>
                     <SelectItem value="GBP">GBP</SelectItem>
@@ -287,13 +291,29 @@ export default function SubmitPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date">Report Date</Label>
-                <Input 
-                  id="date"
-                  type="date" 
-                  value={date} 
-                  onChange={e => setDate(e.target.value)} 
-                />
+                <Label>Month End</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={(selectedDate) => selectedDate && setDate(selectedDate)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
